@@ -63,7 +63,6 @@ namespace Company.Function
             // pretend to start compute set
             await context.CreateTimer(context.CurrentUtcDateTime.AddSeconds(5), CancellationToken.None);
 
-            //log.LogWarning("*** {eventName}: compute set {computeSetId}", "SignalTasksCompleted", taskHierarchy.ComputeSetId);
             var computeSet = context.CreateEntityProxy<IComputeSet>(new EntityId(nameof(ComputeSet), computeSetId));
             await computeSet.SignalComputeSetStarted();
         }
