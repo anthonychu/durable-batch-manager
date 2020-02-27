@@ -45,6 +45,16 @@ namespace Company.Function
 
         private async Task RunNextTaskIfComputeIsAvailable()
         {
+            if (Status != ComputeSetStatus.Running)
+            {
+                if (Status == ComputeSetStatus.NotStarted)
+                {
+                    Entity.Current.StartNewOrchestration(nameof(Orchestrators.StartComputeSetOrchestrator), Entity.Current.EntityKey);
+                    Status = ComputeSetStatus.Starting;
+                }
+                return;
+            }
+
             var computeIsAvailable = CurrentRequest == null;
             if (!computeIsAvailable) {
                 return;
@@ -66,7 +76,19 @@ namespace Company.Function
                 TaskOrchestratorInstanceId = instanceId,
                 Tasks = taskHierarchy
             };
-            await client.StartNewAsync(nameof(Orchestrators.TaskExecutionOrchestrator), null, CurrentRequest);
+            Entity.Current.StartNewOrchestration(nameof(Orchestrators.TaskExecutionOrchestrator), CurrentRequest);
+        }
+
+        public Task SignalComputeSetStarted()
+        {
+            Status = ComputeSetStatus.Running;
+            return RunNextTaskIfComputeIsAvailable();
+        }
+
+        public Task ShutdownComputeSet()
+        {
+            Status = ComputeSetStatus.NotStarted;
+            return Task.CompletedTask;
         }
     }
 
@@ -74,6 +96,8 @@ namespace Company.Function
     {
         Task QueueTasksForOrchestration(string TaskOrchestratorInstanceId);
         Task SignalTasksCompleted(TaskExecutionRequest request);
+        Task SignalComputeSetStarted();
+        Task ShutdownComputeSet();
     }
 
     public enum ComputeSetStatus

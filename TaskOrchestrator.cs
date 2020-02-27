@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Extensions.Logging;
 
 namespace Company.Function
@@ -50,6 +50,24 @@ namespace Company.Function
             await computeSet.SignalTasksCompleted(request);
         }
 
+        [FunctionName(nameof(StartComputeSetOrchestrator))]
+        public static async Task StartComputeSetOrchestrator(
+            [OrchestrationTrigger]IDurableOrchestrationContext context,
+            ILogger log)
+        {
+            log = context.CreateReplaySafeLogger(log);
+            var computeSetId = context.GetInput<string>();
+
+            log.LogWarning("*** {eventName}: {computeSetId}", "ComputeSetStarting", computeSetId);
+            
+            // pretend to start compute set
+            await context.CreateTimer(context.CurrentUtcDateTime.AddSeconds(5), CancellationToken.None);
+
+            //log.LogWarning("*** {eventName}: compute set {computeSetId}", "SignalTasksCompleted", taskHierarchy.ComputeSetId);
+            var computeSet = context.CreateEntityProxy<IComputeSet>(new EntityId(nameof(ComputeSet), computeSetId));
+            await computeSet.SignalComputeSetStarted();
+        }
+    
         [FunctionName(nameof(ExecuteTask))]
         public static async Task<string> ExecuteTask([ActivityTrigger] TaskItem taskItem, ILogger log)
         {
@@ -64,9 +82,10 @@ namespace Company.Function
             [DurableClient]IDurableOrchestrationClient starter,
             ILogger log)
         {
-            var taskHierarchyCount = 30;
-            var computeSetCount = 5;
-            var tasksPerHierarchy = 3;
+            var taskHierarchyCount = 100;
+            var computeSetCount = 10;
+            var tasksPerHierarchy = 1;
+
             var instanceIds = new List<string>();
             var rand = new Random();
 
@@ -88,6 +107,20 @@ namespace Company.Function
             }
 
             return instanceIds;
+        }
+
+        [FunctionName(nameof(ShutdownComputeSets))]
+        public static async Task ShutdownComputeSets(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route="shutdown/{count=1}")]HttpRequestMessage req,
+            int count,
+            [DurableClient]IDurableEntityClient client,
+            ILogger log)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                var entityId = new EntityId(nameof(ComputeSet), i.ToString());
+                await client.SignalEntityAsync<IComputeSet>(entityId, cs => cs.ShutdownComputeSet());
+            }
         }
     }
 }
