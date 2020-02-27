@@ -26,8 +26,6 @@ namespace Company.Function
 
         public Task QueueTasksForOrchestration(string taskOrchestratorInstanceId)
         {
-            // TODO: if not running, call an orchestration to start compute set
-
             InstanceIdQueue.Enqueue(taskOrchestratorInstanceId);
             return RunNextTaskIfComputeIsAvailable();
         }
